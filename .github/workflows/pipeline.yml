@@ -1,0 +1,30 @@
+name: UK Crime Data Pipeline
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"      # every Monday at 06:00 UTC
+  workflow_dispatch: {}      # lets you start it by hand
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run the cleaning tests
+        run: python tests/test_clean.py
+      - name: Write GCP credentials
+        run: echo '${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}' > gcp-credentials.json
+      - name: Run pipeline
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: gcp-credentials.json
+          BQ_PROJECT_ID: ${{ secrets.BQ_PROJECT_ID }}
+        run: python run_pipeline.py
+      - name: Keep the cleaned CSV from this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: crimes_clean
+          path: data/crimes_clean.csv
